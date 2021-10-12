@@ -1,0 +1,67 @@
+version: "3"
+services:
+
+  redis:
+    image: "redislabs/rejson:latest"
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - DISABLE_COMMANDS=FLUSHDB,FLUSHALL,CONFIG
+    container_name: channeltime-redis
+    expose:
+    - "6379"
+    volumes:
+      - "./data/redis:/data"
+
+  gateway:
+    image: leolox/channeltime-gateway:latest
+    #build: ./server/gateway
+    container_name: channeltime-gateway
+    environment:
+      - REDIS_HOSTNAME=redis
+    env_file: 
+      - config.env
+    ports:
+      - "3031:3031"
+    depends_on:
+      - "redis"
+    volumes:
+      - ./data/certbot/conf:/certs
+
+  voice:
+    image: leolox/channeltime-voice:latest
+    #build: ./server/voice
+    container_name: channeltime-voice
+    environment:
+      - GATEWAY_HOSTNAME=gateway
+    env_file: 
+      - config.env
+    depends_on:
+        - "gateway"
+    volumes:
+        - ./data/certbot/conf:/certs
+    network_mode: "host"
+
+
+  nginx:
+    image: leolox/channeltime-web:latest
+    #build: ./client
+    container_name: channeltime-web
+    env_file: 
+      - config.env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./data/nginx:/etc/nginx/conf.d
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+
+  certbot:
+    image: certbot/certbot
+    container_name: channeltime-certbot
+    volumes:
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
