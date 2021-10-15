@@ -26,6 +26,7 @@ services:
       - "redis"
     volumes:
       - ./data/certbot/conf:/certs
+      - ./data/user_uploads:/app/user_uploads
 
   voice:
     image: leolox/channeltime-voice:latest
